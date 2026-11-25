@@ -1,0 +1,48 @@
+name: Stealth Contribution Graph
+description: Turns a GitHub contribution graph into an animated stealth level where an intruder sneaks past patrolling guards.
+author: Egroses
+branding:
+  icon: eye-off
+  color: green
+
+inputs:
+  github_user_name:
+    description: Whose contribution graph to use.
+    default: ${{ github.repository_owner }}
+  github_token:
+    description: Token used to read the contribution graph and to push the images.
+    default: ${{ github.token }}
+  output_dir:
+    description: Folder the two SVG files are written to.
+    default: dist
+  publish_branch:
+    description: Branch the SVG files are force-pushed to. Leave empty to only generate them.
+    default: output
+
+runs:
+  using: composite
+  steps:
+    - name: Generate the stealth level
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        STEALTH_USER: ${{ inputs.github_user_name }}
+        STEALTH_OUT: ${{ inputs.output_dir }}
+      run: python3 "$GITHUB_ACTION_PATH/stealth.py" --user "$STEALTH_USER" --out "$STEALTH_OUT"
+
+    - name: Publish to a branch
+      if: inputs.publish_branch != ''
+      shell: bash
+      env:
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        STEALTH_OUT: ${{ inputs.output_dir }}
+        STEALTH_BRANCH: ${{ inputs.publish_branch }}
+      run: |
+        cd "$STEALTH_OUT"
+        git init -q
+        git checkout -q -b "$STEALTH_BRANCH"
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add stealth-dark.svg stealth-light.svg
+        git commit -q -m "Update stealth level"
+        git push -q -f "https://x-access-token:${GITHUB_TOKEN}@${GITHUB_SERVER_URL#https://}/${GITHUB_REPOSITORY}.git" "HEAD:refs/heads/$STEALTH_BRANCH"
